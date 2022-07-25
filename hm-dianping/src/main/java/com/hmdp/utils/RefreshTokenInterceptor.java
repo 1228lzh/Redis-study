@@ -26,7 +26,7 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         //1.获取请求头中的token
         String token = request.getHeader("authorization");
-        if (token.isBlank()) {
+        if (token==null) {
             //不存在,放行
             return true;
         }
@@ -45,7 +45,8 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
         UserHolder.saveUser(userDTO);
 
         //6. 刷新token有效期
-        stringRedisTemplate.expire(LOGIN_TOKEN_KEY,LOGIN_USER_TTL, TimeUnit.MINUTES);
+        //LOGIN_TOKEN_KEY+token  ---->key值要一致
+        stringRedisTemplate.expire(LOGIN_TOKEN_KEY+token,LOGIN_USER_TTL, TimeUnit.MINUTES);
         //7. 放行
         return true;
     }

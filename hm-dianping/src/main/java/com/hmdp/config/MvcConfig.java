@@ -14,10 +14,12 @@ import javax.annotation.Resource;
 public class MvcConfig implements WebMvcConfigurer {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         //执行顺序按照注册顺序
-        registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate)).order(0);
+        registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))
+                .addPathPatterns("/**").order(0);
         registry.addInterceptor(new LoginInterceptor())
                 .excludePathPatterns(
                         "/user/code",
