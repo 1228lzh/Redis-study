@@ -1,29 +1,56 @@
 package com.hmdp.utils;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.hmdp.dto.UserDTO;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import static com.hmdp.utils.RedisConstants.LOGIN_TOKEN_KEY;
+import static com.hmdp.utils.RedisConstants.LOGIN_USER_TTL;
 
 public class LoginInterceptor implements HandlerInterceptor {
+
+
+    private StringRedisTemplate stringRedisTemplate;
+
+    public LoginInterceptor(StringRedisTemplate stringRedisTemplate) {
+        this.stringRedisTemplate = stringRedisTemplate;
+    }
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        //1.获取session中的用户
-        HttpSession session = request.getSession();
-        Object user = session.getAttribute("user");
+        //1.获取请求头中的token
+        String token = request.getHeader("authorization");
+        if (token.isBlank()) {
+            //不存在,拦截,返回401状态码
+            response.setStatus(401);
+            return false;
+        }
+        //2.基于token获取redis中的用户
+        Map<Object, Object> userMap = stringRedisTemplate.opsForHash()
+                .entries(RedisConstants.LOGIN_TOKEN_KEY + token);
         //2.判断用户是否存在
-        if (user == null) {
+        if (userMap.isEmpty()) {
             //3.不存在,拦截,返回401状态码
             response.setStatus(401);
             return false;
         }
 
-        //4.存在,保存用户信息到ThreadLocal
-        UserHolder.saveUser((UserDTO) user);
+        //4. 将查询到的Hash数据转换为userDTO对象
+        UserDTO userDTO = BeanUtil.fillBeanWithMap(userMap, new UserDTO(), false);
+        //5. 存在,保存用户信息到ThreadLocal
+        UserHolder.saveUser(userDTO);
 
-        //5.放行
+        //6. 刷新token有效期
+        stringRedisTemplate.expire(LOGIN_TOKEN_KEY,LOGIN_USER_TTL, TimeUnit.MINUTES);
+        //7. 放行
         return true;
     }
 
