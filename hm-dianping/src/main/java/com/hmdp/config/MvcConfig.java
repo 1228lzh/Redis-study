@@ -10,6 +10,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import javax.annotation.Resource;
 
+/**
+ * @author king
+ */
 @Configuration
 public class MvcConfig implements WebMvcConfigurer {
     @Resource

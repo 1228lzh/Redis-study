@@ -17,22 +17,47 @@ import java.util.function.Function;
 
 import static com.hmdp.utils.RedisConstants.*;
 
+/**
+ * The type Cache client.
+ * @author ZH
+ */
 @Slf4j
 @Component
 public class CacheClient {
 
     private StringRedisTemplate stringRedisTemplate;
 
+    /**
+     * Instantiates a new Cache client.
+     *
+     * @param stringRedisTemplate the string redis template
+     */
     public CacheClient(StringRedisTemplate stringRedisTemplate) {
         this.stringRedisTemplate = stringRedisTemplate;
     }
 
 
+    /**
+     * Set.
+     *
+     * @param key      the key
+     * @param value    the value
+     * @param time     the time
+     * @param timeUnit the time unit
+     */
     //写入
     public void set(String key, Object value, Long time, TimeUnit timeUnit){
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(value),time,timeUnit);
     }
 
+    /**
+     * Set with logical expire.
+     *
+     * @param key      the key
+     * @param value    the value
+     * @param time     the time
+     * @param timeUnit the time unit
+     */
     //设置逻辑过期时间并写入redis
     public void setWithLogicalExpire(String key, Object value, Long time, TimeUnit timeUnit){
         //设置逻辑过期时间
@@ -43,6 +68,19 @@ public class CacheClient {
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData));
     }
 
+    /**
+     * Query with pass through r.
+     *
+     * @param <R>        the type parameter
+     * @param <ID>       the type parameter
+     * @param keyPrefix  the key prefix
+     * @param id         the id
+     * @param type       the type
+     * @param dbFallback the db fallback
+     * @param time       the time
+     * @param unit       the unit
+     * @return the r
+     */
     //缓存穿透
     public <R,ID> R queryWithPassThrough(String keyPrefix, ID id, Class<R> type,
                                          Function<ID,R> dbFallback,Long time,TimeUnit unit){
@@ -80,6 +118,20 @@ public class CacheClient {
     //逻辑过期缓存击穿
     private static final ExecutorService CACHE_REBUILD_EXECUTOR = Executors.newFixedThreadPool(10);
 
+    /**
+     * Query with logical expire r.
+     *
+     * @param <R>           the type parameter
+     * @param <ID>          the type parameter
+     * @param keyPrefix     the key prefix
+     * @param lockKeyPrefix the lock key prefix
+     * @param id            the id
+     * @param type          the type
+     * @param dbFallback    the db fallback
+     * @param time          the time
+     * @param unit          the unit
+     * @return the r
+     */
     public <R,ID> R queryWithLogicalExpire(String keyPrefix,String lockKeyPrefix,ID id,Class<R> type,
                                            Function<ID,R> dbFallback,Long time,TimeUnit unit){
         String key = keyPrefix + id;
@@ -134,17 +186,39 @@ public class CacheClient {
         return r;
     }
 
-    //获取锁(伪 setIfAbsent
+    /**
+     *获取锁(伪 setIfAbsent
+     */
     private boolean tryLock(String key){
         Boolean flag = stringRedisTemplate.opsForValue().setIfAbsent(key, "1", 10, TimeUnit.SECONDS);
         return BooleanUtil.isTrue(flag);
     }
+
+    /**
+     * Unlock.
+     *
+     * @param key the key
+     */
     //释放锁(伪 delete
     public void unlock(String key){
         stringRedisTemplate.delete(key);
     }
 
 
+    /**
+     * Query with mutes r.
+     *
+     * @param <R>           the type parameter
+     * @param <ID>          the type parameter
+     * @param keyPrefix     the key prefix
+     * @param lockKeyPrefix the lock key prefix
+     * @param id            the id
+     * @param type          the type
+     * @param dbFallback    the db fallback
+     * @param time          the time
+     * @param unit          the unit
+     * @return the r
+     */
     //互斥锁缓存击穿
     public <R,ID> R queryWithMutes(String keyPrefix,String lockKeyPrefix,ID id,Class<R> type,
                                    Function<ID,R> dbFallback,Long time,TimeUnit unit){
@@ -172,7 +246,8 @@ public class CacheClient {
             if (!lock) {
                 //4.3 失败,休眠并重试
                 Thread.sleep(50);
-                return queryWithMutes(keyPrefix,lockKeyPrefix,id,type,dbFallback,time,unit);//调用自己
+                //调用自己
+                return queryWithMutes(keyPrefix,lockKeyPrefix,id,type,dbFallback,time,unit);
             }
             //4.4 成功,根据id查询数据库
 
@@ -189,7 +264,6 @@ public class CacheClient {
             }
             //6.查到了,写到redis里,添加TTL到期删除
             this.set(key,r,time,unit);
-            //stringRedisTemplate.opsForValue().set(key,JSONUtil.toJsonStr(r),CACHE_SHOP_TTL, TimeUnit.MINUTES);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }finally {

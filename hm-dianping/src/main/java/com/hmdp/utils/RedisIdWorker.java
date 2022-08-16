@@ -7,6 +7,11 @@ import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+
+/**
+ * The type Redis id worker.
+ * @author king
+ */
 @Component
 public class RedisIdWorker {
 
